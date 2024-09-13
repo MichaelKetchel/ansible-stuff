@@ -1,0 +1,151 @@
+---
+# tasks file for rxg-vm
+- name: Send template to hypervisor
+  ansible.builtin.uri:
+    url: "https://{{ rxg_hypervisor_address }}/api/config_templates.json?api_key={{ rxg_hypervisor_api_key }}"
+    method: POST
+    body: "{{ vm_creation_payload | to_json }}"
+    validate_certs: no
+    headers:
+      Accept: application/json
+      Content-Type: application/json
+      Media-Type: application/json
+    body_format: json
+    status_code: [201, 400]
+    return_content: true
+  register: vm_creation_response
+  delegate_to: 127.0.0.1
+  failed_when: vm_creation_response['status'] == 400 and 'has already been taken' not in vm_creation_response['json']['errors']['name']
+
+
+- name: Show response
+  debug: var=vm_creation_response
+
+- name: Update existing template instead
+  block:
+    - name: Find template if it already exists
+      ansible.builtin.uri:
+        url: "https://{{ rxg_hypervisor_address }}/api/config_templates.json?api_key={{ rxg_hypervisor_api_key }}&page_size=0&name={{ ('Create ' + inventory_hostname) | urlencode }}"
+        method: GET
+        validate_certs: no
+        headers:
+          Accept: application/json
+          Content-Type: application/json
+          Media-Type: application/json
+        body_format: json
+        status_code: [ 200 ]
+        return_content: true
+      register: vm_find_response
+      delegate_to: 127.0.0.1
+      failed_when: vm_find_response is failed or ( vm_find_response['json'] | length ) == 0
+
+    - name: Show response
+      debug: var=vm_find_response
+
+    - name: Update template if it already exists
+      ansible.builtin.uri:
+        url: "https://{{ rxg_hypervisor_address }}/api/config_templates/{{ vm_find_response['json'][0]['id'] }}.json?api_key={{ rxg_hypervisor_api_key }}"
+        method: PATCH
+        body: "{{ vm_creation_payload | to_json }}"
+        validate_certs: no
+        headers:
+          Accept: application/json
+          Content-Type: application/json
+          Media-Type: application/json
+        body_format: json
+        status_code: [ 200,201 ]
+        return_content: true
+      register: vm_update_response
+      delegate_to: 127.0.0.1
+
+    - name: Show response
+      debug: var=vm_update_response
+
+    - name: Copy update to creation response
+      set_fact:
+        vm_creation_response: "{{ vm_update_response }}"
+
+  when: vm_creation_response['status'] == 400
+
+- name: Apply template if it passed
+  when: vm_creation_response is not failed
+  ansible.builtin.uri:
+    url: "https://{{ rxg_hypervisor_address }}/api/config_templates/{{ vm_creation_response['json']['id'] }}/apply.json?api_key={{ rxg_hypervisor_api_key }}"
+    method: PUT
+    validate_certs: no
+    headers:
+      Accept: application/json
+      Content-Type: application/json
+      Media-Type: application/json
+    body_format: json
+    status_code: [ 200,201 ]
+    return_content: true
+  register: vm_apply_response
+  delegate_to: 127.0.0.1
+
+- name: Show response
+  debug: var=vm_apply_response
+
+- name: Find VM
+  ansible.builtin.uri:
+    url: "https://{{ rxg_hypervisor_address }}/api/virtual_machines.json?api_key={{ rxg_hypervisor_api_key }}&page_size=0&name={{ inventory_hostname | urlencode }}"
+    method: GET
+    validate_certs: no
+    headers:
+      Accept: application/json
+      Content-Type: application/json
+      Media-Type: application/json
+    body_format: json
+    status_code: [ 200 ]
+    return_content: true
+  register: vm_find_response
+  delegate_to: 127.0.0.1
+  failed_when: vm_find_response is failed or ( vm_find_response['json'] | length ) == 0
+
+- name: Wait until VM is ready
+  uri:
+    url: "https://{{ rxg_hypervisor_address }}/api/virtual_machines/{{ vm_find_response['json'][0]['id'] }}.json?api_key={{ rxg_hypervisor_api_key }}"
+    method: GET
+    validate_certs: no
+    headers:
+      Accept: application/json
+      Content-Type: application/json
+      Media-Type: application/json
+    return_content: yes
+    body_format: json
+  register: result
+  delegate_to: 127.0.0.1
+  until: result.json.state in ["Stopped", "Running"]
+  retries: 10
+  delay: 5
+
+- name: Print JSON response from the uri task
+  debug:
+    var: result
+
+- name: Start vm
+  ansible.builtin.uri:
+    url: "https://{{ rxg_hypervisor_address }}/api/virtual_machines/{{ vm_find_response['json'][0]['id'] }}/execute.json?api_key={{ rxg_hypervisor_api_key }}"
+    method: POST
+    validate_certs: no
+    body:
+      method: start
+    headers:
+      Accept: application/json
+      Content-Type: application/json
+      Media-Type: application/json
+    body_format: json
+    status_code: [ 200 ]
+    return_content: true
+  register: vm_start_response
+  delegate_to: 127.0.0.1
+#    failed_when: vm_start_response is failed or ( vm_start_response['json'] | length ) == 0
+
+- name: Show response
+  debug: var=vm_start_response
+
+
+#
+#- name: Wait for system to become reachable
+#  ansible.builtin.wait_for_connection:
+#    timeout: 3600

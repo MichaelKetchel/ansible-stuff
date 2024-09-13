@@ -1,0 +1,20 @@
+---
+
+ungrouped:
+  hosts:
+
+builders:
+  hosts:
+    builder-[01:02]:
+  vars:
+    ansible_host: "192.168.20.{{ (inventory_hostname[-2:] | int ) + 99  }}"
+    ansible_user: ubuntu
+    network_gateway: 192.168.20.1
+    network_nameservers: 192.168.20.1
+    hypervisor_hostname: 192.168.7.54
+    disk_size: 40
+    cpu_cores: 4
+    memory_size: 8
+    autostart: true
+    ssh_keypair: "mdk (RG Nets)"
+    cloudinit_image: "ubuntu-22.04-server-cloudimg-amd64.img"1

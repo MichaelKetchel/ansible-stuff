@@ -1,0 +1,36 @@
+# roles/myapp/meta/argument_specs.yml
+---
+argument_specs:
+  main:
+    short_description: Main entry point for the rxg-vm role
+    description:
+      - Creates a VM with the given settings on an rXg
+    author:
+      - Michael Ketchel
+    options:
+      rxg_hypervisor_address:
+        type: "str"
+        required: true
+        description:
+          - "The address of the rXg hypervisor"
+
+      rxg_hypervisor_api_key:
+        type: "str"
+        required: true
+        description:
+          - "The API Key for the rXg hypervisor"
+
+      vm_creation_template:
+        type: "str"
+        required: true
+        description:
+          - "The Config Template for VM creation"
+
+      vm_creation_payload:
+        type: "dict"
+        required: true
+#        default:
+#          name: "Create {{ inventory_hostname }}"
+#          template: "{{ vm_creation_template }}"
+        description:
+          - "The payload template for VM creation"

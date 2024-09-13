@@ -1,0 +1,33 @@
+---
+# defaults file for rxg-vm
+rxg_hypervisor_address:
+rxg_hypervisor_api_key:
+vm_creation_template: |-
+  ---
+  VirtualMachine:
+  - name: {{ inventory_hostname }}
+    bootloader: uefi
+    memory_gb: {{ memory_size }}
+    ncpu: {{ cpu_cores }}
+    autostart: {{ autostart }}
+    graphics_res: 1024x768
+    virtualization_host: {{ hypervisor_hostname }}
+    nameservers: {{ network_nameservers }}
+    cidr: {{ ansible_host }}/24
+    gateway: {{ network_gateway }}
+    hostname: {{ inventory_hostname }}{{ hostname_suffix }}
+    image_path: "/space/disk_images/{{cloudinit_image}}"
+    ssh_keypair: {{ ssh_keypair }}
+    disk_image: {filename: "{{cloudinit_image}}"}
+    resize: true
+    virtual_disks:
+    - name: {{ inventory_hostname }}-d0
+      size_gb: {{ disk_size }}
+      emulation: virtio-blk
+    virtual_interfaces:
+    - name: {{ inventory_hostname }}-if0
+      emulation: virtio-net
+      virtual_switch: ix1
+vm_creation_payload:
+  name: "Create {{ inventory_hostname }}"
+  template: "{{ vm_creation_template }}"
